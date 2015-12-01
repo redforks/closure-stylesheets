@@ -22,6 +22,7 @@ import com.google.common.css.compiler.ast.CssBlockNode;
 import com.google.common.css.compiler.ast.CssCommentNode;
 import com.google.common.css.compiler.ast.CssDeclarationBlockNode;
 import com.google.common.css.compiler.ast.CssNode;
+import com.google.common.css.compiler.ast.CssDeclarationNode;
 import com.google.common.css.compiler.ast.CssRootNode;
 import com.google.common.css.compiler.ast.CssRulesetNode;
 import com.google.common.css.compiler.ast.CssSelectorListNode;
@@ -125,6 +126,15 @@ public class PassUtil {
    * the node.
    */
   public static boolean hasAlternateAnnotation(CssNode node) {
+    // Always consider background-image has @alternate marked to allow it have alternate value
+    // autoprexed generate alternate value for background-image css property
+    if (node instanceof CssDeclarationNode) {
+      CssDeclarationNode dec = (CssDeclarationNode)node;
+      if (dec.getPropertyName().getPropertyName() == "background-image") {
+        return true;
+      }
+    }
+
     for (CssCommentNode comment : node.getComments()) {
       if (comment.getValue().equals(ALTERNATE)) {
         return true;
