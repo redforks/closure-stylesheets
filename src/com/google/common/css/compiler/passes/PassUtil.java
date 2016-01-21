@@ -130,7 +130,8 @@ public class PassUtil {
     // autoprexed generate alternate value for background-image css property
     if (node instanceof CssDeclarationNode) {
       CssDeclarationNode dec = (CssDeclarationNode)node;
-      if (dec.getPropertyName().getPropertyName() == "background-image") {
+      String propName = dec.getPropertyName().getPropertyName();
+      if (propName == "background-image" || propName == "height") {
         return true;
       }
     }
