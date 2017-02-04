@@ -28,6 +28,7 @@ import com.google.common.css.SourceCodeLocation;
 import com.google.common.css.compiler.ast.CssAtRuleNode;
 import com.google.common.css.compiler.ast.CssBlockNode;
 import com.google.common.css.compiler.ast.CssClassSelectorNode;
+import com.google.common.css.compiler.ast.CssClassSelectorNode.ComponentScoping;
 import com.google.common.css.compiler.ast.CssCombinatorNode;
 import com.google.common.css.compiler.ast.CssCompilerPass;
 import com.google.common.css.compiler.ast.CssComponentNode;
@@ -37,6 +38,7 @@ import com.google.common.css.compiler.ast.CssFunctionNode;
 import com.google.common.css.compiler.ast.CssLiteralNode;
 import com.google.common.css.compiler.ast.CssNode;
 import com.google.common.css.compiler.ast.CssProvideNode;
+import com.google.common.css.compiler.ast.CssPseudoClassNode;
 import com.google.common.css.compiler.ast.CssRootNode;
 import com.google.common.css.compiler.ast.CssRulesetNode;
 import com.google.common.css.compiler.ast.CssSelectorNode;
@@ -140,8 +142,13 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
     // Note that this works because enterComponent, above, returns false -
     // this visitor never sees class selectors inside components (the other
     // visitor does).
-    if (node.isComponentScoped()) {
+    if (node.getScoping() == ComponentScoping.FORCE_SCOPED) {
       reportError("'%' prefix for class selectors may only be used in the scope of an @component",
+          node);
+      return false;
+    }
+    if (node.getScoping() == ComponentScoping.FORCE_UNSCOPED) {
+      reportError("'^' prefix for class selectors may only be used in the scope of an @component",
           node);
       return false;
     }
@@ -212,6 +219,7 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
       Set<String> constants, CssComponentNode target, CssComponentNode source) {
     CssBlockNode sourceBlock = source.getBlock();
     CssBlockNode copyBlock = new CssBlockNode(false, sourceBlock.deepCopy().getChildren());
+    copyBlock.setSourceCodeLocation(source.getBlock().getSourceCodeLocation());
     CssTree tree = new CssTree(
         target.getSourceCodeLocation().getSourceCode(), new CssRootNode(copyBlock));
     new TransformNodes(constants, target, target != source,
@@ -273,8 +281,9 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
     private final String defPrefix;
     private final String parentName;
     private final SourceCodeLocation sourceCodeLocation;
-    private int inCombinator;
     private boolean firstClassSelector;
+    /** If non-zero, we won't process the first classname in the current selector. */
+    private int nestedSelectorDepth;
 
     public TransformNodes(Set<String> constants, CssComponentNode current, boolean inAncestorBlock,
         MutatingVisitController visitController, ErrorManager errorManager,
@@ -320,13 +329,13 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
 
     @Override
     public boolean enterCombinator(CssCombinatorNode combinator) {
-      inCombinator++;
+      nestedSelectorDepth++;
       return true;
     }
 
     @Override
     public void leaveCombinator(CssCombinatorNode combinator) {
-      inCombinator--;
+      nestedSelectorDepth--;
     }
 
     @Override
@@ -334,7 +343,7 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
       // Only reset the 'first selector' flag if we're not in a combinator.
       // Otherwise, keep the same flag value (which may or may not have been set
       // depending on whether we saw a class selector in an earlier refiner list.)
-      if (inCombinator == 0) {
+      if (nestedSelectorDepth == 0) {
         firstClassSelector = true;
       }
       return true;
@@ -345,10 +354,28 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
       firstClassSelector = false;
     }
 
+    // Don't reset firstClassSelector for classes in :not().
+    @Override
+    public boolean enterPseudoClass(CssPseudoClassNode pseudoClass) {
+      nestedSelectorDepth++;
+      return true;
+    }
+
+    @Override
+    public void leavePseudoClass(CssPseudoClassNode pseudoClass) {
+      nestedSelectorDepth--;
+    }
+
     @Override
     public boolean enterClassSelector(CssClassSelectorNode node) {
       Preconditions.checkState(!isAbstract);
-      if (firstClassSelector || node.isComponentScoped()) {
+      if (!firstClassSelector && node.getScoping() == ComponentScoping.FORCE_UNSCOPED) {
+        errorManager.report(new GssError(
+            "'^' prefix may only be used on the first classname in a selector.",
+            node.getSourceCodeLocation()));
+      }
+      if (firstClassSelector && node.getScoping() != ComponentScoping.FORCE_UNSCOPED
+          || node.getScoping() == ComponentScoping.FORCE_SCOPED) {
         CssClassSelectorNode newNode = new CssClassSelectorNode(
             classPrefix + node.getRefinerName(),
             inAncestorBlock ? sourceCodeLocation : node.getSourceCodeLocation());
@@ -377,6 +404,7 @@ public class ProcessComponents<T> extends DefaultTreeVisitor
       // propagate to descendant components).
       if (inAncestorBlock) {
         String parentRefPrefix = parentName + DEF_SEP;
+        // Hack to avoid breaking hacked components with http://b/3213779
         // workarounds.  Can be removed when all workarounds are removed.
         String parentRefName = defName.startsWith(parentRefPrefix)
             ? defName : parentRefPrefix + defName;

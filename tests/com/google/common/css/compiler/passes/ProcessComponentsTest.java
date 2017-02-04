@@ -238,6 +238,12 @@ public class ProcessComponentsTest extends PassesTestBase {
   // in the output.
   private final ImmutableList<String> prefixingTestInputRules = ImmutableList.of(
       "  .PREFIX_A1.NO_PREFIX_A2,",     // Complex selector
+      "  .PREFIX_A1:not(.NO_PREFIX_A2),",  // :not() selector
+      "  .PREFIX_A1:not(.%PREFIX_A2),",  // :not() selector
+      "  .PREFIX_A1 .NO_PREFIX_B2:not(.NO_PREFIX_B3),",  // :not() selector
+      "  .PREFIX_A1 .NO_PREFIX_B2:not(.%PREFIX_B3),",  // :not() selector
+      "  :not(.PREFIX_A1).NO_PREFIX_A2,",  // :not() selector as first class selector
+      "  :not(.PREFIX_A1).%PREFIX_A2,",  // :not() selector as first class selector
       "  .PREFIX_B1 .NO_PREFIX_B2,",    // Descendant combinator
       "  .PREFIX_C1 > .NO_PREFIX_C2,",  // Child combinator
       "  TD.PREFIX_D1.NO_PREFIX_D2,",   // Element refiner before class refiner
@@ -245,6 +251,7 @@ public class ProcessComponentsTest extends PassesTestBase {
       "  TD.PREFIX_F1 TD.NO_PREFIX_F2,", // Multiple element refiners
       "  #X.PREFIX_G1.NO_PREFIX_G2,",   // ID refiner
       "  #X.PREFIX_H1 .NO_PREFIX_H2,",  // ID refiner with combinator
+      "  .^NO_PREFIX_A1.NO_PREFIX_A2,", // Explicit unscoped with complex selector
       "  .PREFIX_I1.%PREFIX_I2,",       // Explicit scoped with complex selector
       "  .PREFIX_J1 .%PREFIX_J2,",      // Explicit scoped with descendant combinator
       "  .PREFIX_K1 > .%PREFIX_K2,",    // Explicit scoped with child combinator
@@ -272,6 +279,12 @@ public class ProcessComponentsTest extends PassesTestBase {
   // errors easier to diagnose.
   private final String prefixingTestComponentOutput =
       "[.someExamplePackagePREFIX_A1.NO_PREFIX_A2," +
+      ".someExamplePackagePREFIX_A1:not(.NO_PREFIX_A2)," +
+      ".someExamplePackagePREFIX_A1:not(.someExamplePackagePREFIX_A2)," +
+      ".someExamplePackagePREFIX_A1 .NO_PREFIX_B2:not(.NO_PREFIX_B3)," +
+      ".someExamplePackagePREFIX_A1 .NO_PREFIX_B2:not(.someExamplePackagePREFIX_B3)," +
+      ":not(.someExamplePackagePREFIX_A1).NO_PREFIX_A2," +
+      ":not(.someExamplePackagePREFIX_A1).someExamplePackagePREFIX_A2," +
       ".someExamplePackagePREFIX_B1 .NO_PREFIX_B2," +
       ".someExamplePackagePREFIX_C1>.NO_PREFIX_C2," +
       "TD.someExamplePackagePREFIX_D1.NO_PREFIX_D2," +
@@ -279,6 +292,7 @@ public class ProcessComponentsTest extends PassesTestBase {
       "TD.someExamplePackagePREFIX_F1 TD.NO_PREFIX_F2," +
       "#X.someExamplePackagePREFIX_G1.NO_PREFIX_G2," +
       "#X.someExamplePackagePREFIX_H1 .NO_PREFIX_H2," +
+      ".NO_PREFIX_A1.NO_PREFIX_A2," +
       ".someExamplePackagePREFIX_I1.someExamplePackagePREFIX_I2," +
       ".someExamplePackagePREFIX_J1 .someExamplePackagePREFIX_J2," +
       ".someExamplePackagePREFIX_K1>.someExamplePackagePREFIX_K2," +
