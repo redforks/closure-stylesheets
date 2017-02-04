@@ -112,10 +112,6 @@ public class DisallowDuplicateDeclarations extends DefaultTreeVisitor
       return;
     }
 
-    if (propertyNames.contains(propertyName)) {
-      errorManager.report(new GssError(ERROR_STR + declaration, location));
-    } else {
-      propertyNames.add(propertyName);
-    }
+    propertyNames.add(propertyName);
   }
 }
